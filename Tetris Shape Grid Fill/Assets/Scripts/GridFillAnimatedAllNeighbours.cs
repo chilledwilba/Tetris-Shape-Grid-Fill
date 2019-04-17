@@ -124,11 +124,7 @@ public class GridFillAnimatedAllNeighbours : MonoBehaviour
             foreach (Block tempBlock in tempBlocks)
             {
                 bool success = CheckDuplicate(tempBlock, blocks);
-
-                if (success)
-                {
-                    blocks.Add(tempBlock);
-                }
+                if (success) blocks.Add(tempBlock);
             }
         }
 
