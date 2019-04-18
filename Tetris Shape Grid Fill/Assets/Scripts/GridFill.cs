@@ -21,6 +21,9 @@ public class GridFill : MonoBehaviour
     bool[,] grid;
     List<Shape> shapes;
 
+    [SerializeField]
+    int[] counts = new int[] { 0, 0, 0, 0, 0, 0 };
+
     void Start()
     {
         for (int i = 0; i < repeat; i++)
@@ -29,7 +32,8 @@ public class GridFill : MonoBehaviour
             shapes = new List<Shape>();
 
             GenerateGrid();
-            print((((gridx * gridy) / 4) - shapes.Count) * 4);
+            //print((((gridx * gridy) / 4) - shapes.Count) * 4);
+            counts[(((gridx * gridy) / 4) - shapes.Count)]++;
         }
 
         LoadShapes();
@@ -69,7 +73,9 @@ public class GridFill : MonoBehaviour
         for (int i = 0; i < 3; i++)
         {
             Block currentGridPosition = shape.blocks[shape.blocks.Count - 1];
-            List<Block> neighbourBlocks = GetNeighbourBlocks(currentGridPosition);
+
+            //List<Block> neighbourBlocks = GetNeighbours(currentGridPosition);
+            List<Block> neighbourBlocks = GetAllNeighbours(shape);
 
             if (neighbourBlocks.Count > 0)
             {
@@ -85,22 +91,6 @@ public class GridFill : MonoBehaviour
             }
         }
         return true;
-    }
-
-    List<Block> GetNeighbourBlocks(Block currentGridPosition)
-    {
-        List<Block> neighbourBlocks = new List<Block>();
-
-        int x = currentGridPosition.x;
-        int y = currentGridPosition.y;
-
-        if (x + 1 >= 0 && x + 1 < gridx && grid[x + 1, y] == false) neighbourBlocks.Add(new Block(x + 1, y));
-        if (x - 1 >= 0 && x - 1 < gridx && grid[x - 1, y] == false) neighbourBlocks.Add(new Block(x - 1, y));
-
-        if (y + 1 >= 0 && y + 1 < gridy && grid[x, y + 1] == false) neighbourBlocks.Add(new Block(x, y + 1));
-        if (y - 1 >= 0 && y - 1 < gridy && grid[x, y - 1] == false) neighbourBlocks.Add(new Block(x, y - 1));
-
-        return neighbourBlocks;
     }
 
     void RevertGrid(Shape shape)
@@ -137,6 +127,53 @@ public class GridFill : MonoBehaviour
             }
         }
     }
+
+    #region Get Neighbour Blocks
+    List<Block> GetAllNeighbours(Shape shape)
+    {
+        List<Block> blocks = new List<Block>();
+
+        foreach (Block item in shape.blocks)
+        {
+            List<Block> tempBlocks = GetNeighbours(item);
+
+            foreach (Block tempBlock in tempBlocks)
+            {
+                bool success = CheckDuplicate(tempBlock, blocks);
+                if (success) blocks.Add(tempBlock);
+            }
+        }
+        return blocks;
+    }
+
+    List<Block> GetNeighbours(Block currentGridPosition)
+    {
+        List<Block> blocks = new List<Block>();
+
+        int x = currentGridPosition.x;
+        int y = currentGridPosition.y;
+
+        if (x + 1 >= 0 && x + 1 < gridx && grid[x + 1, y] == false) blocks.Add(new Block(x + 1, y));
+        if (x - 1 >= 0 && x - 1 < gridx && grid[x - 1, y] == false) blocks.Add(new Block(x - 1, y));
+
+        if (y + 1 >= 0 && y + 1 < gridy && grid[x, y + 1] == false) blocks.Add(new Block(x, y + 1));
+        if (y - 1 >= 0 && y - 1 < gridy && grid[x, y - 1] == false) blocks.Add(new Block(x, y - 1));
+
+        return blocks;
+    }
+
+    bool CheckDuplicate(Block block, List<Block> blocks)
+    {
+        foreach (Block item in blocks)
+        {
+            if (item.x == block.x && item.y == block.y)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+    #endregion
 }
 
 public class Shape

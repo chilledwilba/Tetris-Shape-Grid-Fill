@@ -226,7 +226,7 @@ MonoBehaviour:
   gridx: 8
   gridy: 7
   positionOffset: 1.15
-  repeat: 1
+  repeat: 1000000
   blockPrefab: {fileID: 2284847580617789853, guid: bcc97e0a74be8fe46ba927121f512619,
     type: 3}
   colors:
