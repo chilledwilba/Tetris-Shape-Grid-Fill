@@ -1,194 +1,98 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.SceneManagement;
+using CustomNamespace;
 
 public class GridFill : MonoBehaviour
 {
-    [Header("Grid")]
-    public int gridx = 8;
-    public int gridy = 7;
+    public GridSize gridSize = new GridSize(8, 7);
     public float positionOffset = 1.15f;
-    public int repeat = 1;
-
-    [Header("Blocks")]
     public Transform blockPrefab;
+    public Theme colors;
+    int colorIndex = 0;
 
-    [Header("Color")]
-    public Color[] colors;
+    public enum SearchType { LastBlock, AllBlocks };
+    public SearchType neighbourCellsSearch;
 
     // Lists
     bool[,] grid;
     List<Shape> shapes;
 
-    [SerializeField]
-    int[] counts = new int[] { 0, 0, 0, 0, 0, 0 };
-
     void Start()
     {
-        for (int i = 0; i < repeat; i++)
-        {
-            grid = new bool[gridx, gridy];
-            shapes = new List<Shape>();
+        grid = new bool[gridSize.x, gridSize.y];
+        shapes = new List<Shape>();
+        colorIndex = Random.Range(0, colors.colors.Length);
 
-            GenerateGrid();
-            //print((((gridx * gridy) / 4) - shapes.Count) * 4);
-            counts[(((gridx * gridy) / 4) - shapes.Count)]++;
-        }
+        GenerateGrid();
+        LoadShapeObjects();
 
-        LoadShapes();
+        // Print number of empty cells
+        print((((gridSize.x * gridSize.y) / 4) - shapes.Count) * 4);
     }
 
-    void Update()
-    {
-        if (Input.GetKeyDown(KeyCode.Space)) SceneManager.LoadScene(SceneManager.GetActiveScene().name);
-    }
-
-    #region Generate Grid
     void GenerateGrid()
     {
-        for (int x = 0; x < gridx; x++)
+        for (int x = 0; x < gridSize.x; x++)
         {
-            for (int y = 0; y < gridy; y++)
+            for (int y = 0; y < gridSize.y; y++)
             {
                 if (grid[x, y] == false)
                 {
-                    bool success = GetShape(out Shape shape, x, y);
+                    bool success = GetShape(out Shape shape, new Cell(x, y));
 
-                    if (success) shapes.Add(shape);
-                    else RevertGrid(shape);
+                    if (success)
+                        shapes.Add(shape);
+                    else
+                        foreach (Cell cell in shape.blocks)
+                            grid[cell.x, cell.y] = false;
                 }
             }
         }
     }
 
-    bool GetShape(out Shape shape, int x, int y)
+    bool GetShape(out Shape shape, Cell firstBlock)
     {
-        // First Block
         shape = new Shape();
-        shape.blocks.Add(new Block(x, y));
-        grid[x, y] = true;
+        Cell newShapeBlock = firstBlock;
 
-        // Randomly Choose 3 more blocks
         for (int i = 0; i < 3; i++)
         {
-            Block currentGridPosition = shape.blocks[shape.blocks.Count - 1];
+            // Add Cell
+            shape.blocks.Add(newShapeBlock);
+            grid[newShapeBlock.x, newShapeBlock.y] = true;
 
-            //List<Block> neighbourBlocks = GetNeighbours(currentGridPosition);
-            List<Block> neighbourBlocks = GetAllNeighbours(shape);
+            // Get List of Neighbour Cells
+            List<Cell> neighbourCells;
 
-            if (neighbourBlocks.Count > 0)
-            {
-                int randomBlock = Random.Range(0, neighbourBlocks.Count);
-                Block newBlock = neighbourBlocks[randomBlock];
+            if (neighbourCellsSearch == SearchType.AllBlocks) neighbourCells = Neighbours.Shape(shape, gridSize, grid);
+            else neighbourCells = Neighbours.Block(newShapeBlock, gridSize, grid);
 
-                shape.blocks.Add(newBlock);
-                grid[newBlock.x, newBlock.y] = true;
-            }
-            else
-            {
-                return false;
-            }
+            // Choose a random Neighbour Cell
+            if (neighbourCells.Count > 0) newShapeBlock = neighbourCells[Random.Range(0, neighbourCells.Count)];
+            else return false;
         }
+
+        // Add Cell
+        shape.blocks.Add(newShapeBlock);
+        grid[newShapeBlock.x, newShapeBlock.y] = true;
+
         return true;
     }
 
-    void RevertGrid(Shape shape)
-    {
-        // If a shape hits a dead end revert the grid values it changed
-        foreach (Block block in shape.blocks)
-        {
-            grid[block.x, block.y] = false;
-        }
-    }
-    #endregion
-
-    void LoadShapes()
+    void LoadShapeObjects()
     {
         Transform shapeParent = new GameObject("Shapes").transform;
 
-        int colorIndex = Random.Range(0, colors.Length);
-
         foreach (Shape shape in shapes)
         {
-            Transform shapeObj = new GameObject("Shape").transform;
-            shapeObj.SetParent(shapeParent);
-
             // Color
-            Color color = colors[colorIndex];
+            Color color = colors.colors[colorIndex];
             colorIndex++;
-            if (colorIndex >= colors.Length) colorIndex = 0;
+            if (colorIndex >= colors.colors.Length) colorIndex = 0;
 
-            foreach (Block block in shape.blocks)
-            {
-                Transform blockObj = Instantiate(blockPrefab, shapeObj);
-                blockObj.position = new Vector3(block.x * positionOffset, block.y * positionOffset);
-                blockObj.GetComponent<SpriteRenderer>().color = color;
-            }
+            Transform shapeObj = ShapeObject.CreateShape(shape, blockPrefab, positionOffset, color);
+            shapeObj.SetParent(shapeParent);
         }
-    }
-
-    #region Get Neighbour Blocks
-    List<Block> GetAllNeighbours(Shape shape)
-    {
-        List<Block> blocks = new List<Block>();
-
-        foreach (Block item in shape.blocks)
-        {
-            List<Block> tempBlocks = GetNeighbours(item);
-
-            foreach (Block tempBlock in tempBlocks)
-            {
-                bool success = CheckDuplicate(tempBlock, blocks);
-                if (success) blocks.Add(tempBlock);
-            }
-        }
-        return blocks;
-    }
-
-    List<Block> GetNeighbours(Block currentGridPosition)
-    {
-        List<Block> blocks = new List<Block>();
-
-        int x = currentGridPosition.x;
-        int y = currentGridPosition.y;
-
-        if (x + 1 >= 0 && x + 1 < gridx && grid[x + 1, y] == false) blocks.Add(new Block(x + 1, y));
-        if (x - 1 >= 0 && x - 1 < gridx && grid[x - 1, y] == false) blocks.Add(new Block(x - 1, y));
-
-        if (y + 1 >= 0 && y + 1 < gridy && grid[x, y + 1] == false) blocks.Add(new Block(x, y + 1));
-        if (y - 1 >= 0 && y - 1 < gridy && grid[x, y - 1] == false) blocks.Add(new Block(x, y - 1));
-
-        return blocks;
-    }
-
-    bool CheckDuplicate(Block block, List<Block> blocks)
-    {
-        foreach (Block item in blocks)
-        {
-            if (item.x == block.x && item.y == block.y)
-            {
-                return false;
-            }
-        }
-        return true;
-    }
-    #endregion
-}
-
-public class Shape
-{
-    public List<Block> blocks = new List<Block>();
-}
-
-public class Block
-{
-    public int x;
-    public int y;
-
-    public Block(int x, int y)
-    {
-        this.x = x;
-        this.y = y;
     }
 }
